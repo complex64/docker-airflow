@@ -80,13 +80,33 @@ case "$1" in
     fi
     exec airflow webserver
     ;;
-  worker|scheduler)
+  worker)
     wait_for_port "Postgres" "$POSTGRES_HOST" "$POSTGRES_PORT"
     wait_for_redis
     # To give the webserver time to run initdb.
     sleep 10
     exec airflow "$@"
     ;;
+  scheduler)
+    wait_for_port "Postgres" "$POSTGRES_HOST" "$POSTGRES_PORT"
+    wait_for_redis
+    # To give the webserver time to run initdb.
+    sleep 10
+    # Via Tobias Kaymak
+    # https://github.com/puckel/docker-airflow/issues/55
+    while echo "Running Scheduler"; do
+      # See https://airflow.apache.org/cli.html#scheduler
+      airflow scheduler -n 5
+      exitcode=$?
+      if [ $exitcode -ne 0 ]; then
+        echo "ERROR: Scheduler exited with exit code $?."
+        echo $(date)
+        exit $exitcode
+      fi
+      sleep 30
+    done
+    ;;
+
   flower)
     wait_for_redis
     exec airflow "$@"
